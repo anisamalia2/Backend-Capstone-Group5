@@ -9,26 +9,26 @@ export const createPayment = async (req, res) => {
     const user_id = req.user.id;
     const { paket_id } = req.body;
 
-    if (!paket_id)
+    if (!paket_id) {
       return res.status(400).json({ message: "paket_id required" });
-
-    let total = req.body.total;
-    if (!total) {
-      try {
-        const pak = await pool.query("SELECT * FROM paket WHERE id = $1", [
-          paket_id,
-        ]);
-        paketRow = pak.rows[0];
-        if (!paketRow)
-          return res.status(400).json({ message: "paket not found" });
-        total = paketRow.harga;
-      } catch (err) {
-        if (!total)
-          return res
-            .status(400)
-            .json({ message: "paket not found and total not provided" });
-      }
     }
+
+    // LOG DEBUG (TARUH DI SINI)
+    console.log("paket_id:", paket_id);
+    console.log("DB URL:", process.env.DATABASE_URL ? "OK" : "MISSING");
+
+    // Ambil paket
+    const pak = await pool.query("SELECT id, harga FROM paket WHERE id = $1", [
+      paket_id,
+    ]);
+
+    const paket = pak.rows[0];
+    if (!paket) {
+      return res.status(404).json({ message: "paket not found" });
+    }
+
+    // Total WAJIB dari DB
+    const total = paket.harga;
 
     const p = await model.createPayment({
       user_id,
@@ -44,10 +44,11 @@ export const createPayment = async (req, res) => {
       status: p.status,
     });
   } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ message: "Create payment failed", error: err.message });
+    console.error("CREATE PAYMENT ERROR:", err);
+    res.status(500).json({
+      message: "Create payment failed",
+      error: err.message,
+    });
   }
 };
 
