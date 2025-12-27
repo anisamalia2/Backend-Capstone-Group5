@@ -19,6 +19,15 @@ export const findUserById = async (id) => {
   return rows[0];
 };
 
+// GET USER PREMIUM UNTIL
+export const getUserPremiumUntilById = async (id) => {
+  const { rows } = await pool.query(
+    `SELECT premium_until FROM users WHERE id = $1`,
+    [id]
+  );
+  return rows[0];
+};
+
 //  CREATE USER
 export const createUser = async ({
   username,

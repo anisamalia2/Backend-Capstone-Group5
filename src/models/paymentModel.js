@@ -52,5 +52,43 @@ export const setPaymentStatus = async ({ id, status, approved_by = null }) => {
      RETURNING *`,
     [status, approved_by_val, id]
   );
-  return rows[0];
+  const updated = rows[0];
+
+  // If status changed to paid, update user's premium_until based on paket.duration_months
+  if (updated && status === "paid") {
+    try {
+      const pakRes = await pool.query(
+        "SELECT duration_months FROM paket WHERE id = $1",
+        [updated.paket_id]
+      );
+      const durationMonths = pakRes.rows[0] ? pakRes.rows[0].duration_months : 1;
+
+      await pool.query(
+        `UPDATE users
+         SET premium_until = CASE
+           WHEN premium_until IS NULL OR premium_until < now() THEN now() + ($1 || ' month')::interval
+           ELSE premium_until + ($1 || ' month')::interval
+         END
+         WHERE id = $2`,
+        [durationMonths, updated.user_id]
+      );
+    } catch (err) {
+      // don't fail the status update if paket/users update fails
+      console.warn("Failed to update user premium_until:", err.message);
+    }
+  }
+
+  return updated;
+};
+
+// Auto-reject payments that have been pending for more than 24 hours
+export const autoRejectPayments = async () => {
+  const { rows } = await pool.query(
+    `UPDATE payments
+     SET status = 'rejected', updated_at = now(), approved_by = NULL
+     WHERE (status = 'pending' OR status = 'menunggu_verifikasi_admin')
+       AND created_at < now() - interval '24 hours'
+     RETURNING *`
+  );
+  return rows;
 };

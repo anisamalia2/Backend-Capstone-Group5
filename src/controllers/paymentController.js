@@ -111,6 +111,25 @@ export const listPayments = async (req, res) => {
   }
 };
 
+// Admin (guru): auto-reject pending transactions older than 24 hours (for UAT/cron)
+export const autoRejectPayments = async (req, res) => {
+  try {
+    if (req.user.role !== "GURU")
+      return res.status(403).json({ message: "Akses hanya untuk GURU" });
+
+    const rejected = await model.autoRejectPayments();
+
+    res.json({
+      message: "Auto-reject complete",
+      rejected_count: rejected.length,
+      payments: rejected,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Auto reject failed", error: err.message });
+  }
+};
+
 // Admin (guru): approve payment
 export const approvePayment = async (req, res) => {
   try {
@@ -129,30 +148,7 @@ export const approvePayment = async (req, res) => {
       approved_by: adminId,
     });
 
-    // berikan akses premium kepada user — gunakan paket.duration_months jika tersedia
-    try {
-      const pak = await pool.query(
-        "SELECT duration_months FROM paket WHERE id = $1",
-        [p.paket_id]
-      );
-      const durationMonths = pak.rows[0] ? pak.rows[0].duration_months : 1;
-
-      // update user's premium_until: if null => now() + duration; if exists => premium_until + duration
-      await pool.query(
-        `UPDATE users
-         SET premium_until = CASE
-           WHEN premium_until IS NULL OR premium_until < now() THEN now() + ($1 || ' month')::interval
-           ELSE premium_until + ($1 || ' month')::interval
-         END
-         WHERE id = $2`,
-        [durationMonths, p.user_id]
-      );
-    } catch (err) {
-      console.warn(
-        "paket table missing or duration issue, skipping premium update",
-        err.message
-      );
-    }
+    // premium update is handled in model.setPaymentStatus
 
     res.json({ message: "Payment approved", payment: updated });
   } catch (err) {

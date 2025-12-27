@@ -8,6 +8,7 @@ import {
   listPayments,
   approvePayment,
   rejectPayment,
+  autoRejectPayments,
 } from "../controllers/paymentController.js";
 
 const router = express.Router();
@@ -25,5 +26,7 @@ router.get("/status/:id", verifyToken, getPaymentStatus);
 router.get("/list", verifyToken, roleGuru, listPayments);
 router.post("/approve/:id", verifyToken, roleGuru, approvePayment);
 router.post("/reject/:id", verifyToken, roleGuru, rejectPayment);
+// Admin: trigger auto-reject for pending transactions older than 24 hours (UAT)
+router.post("/auto-reject", verifyToken, roleGuru, autoRejectPayments);
 
 export default router;

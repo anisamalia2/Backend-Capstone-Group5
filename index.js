@@ -11,6 +11,7 @@ import quizRoutes from "./src/routes/quizRoutes.js";
 import { errorHandler } from "./src/middleware/errorHandler.js";
 import paymentRoutes from "./src/routes/paymentRoutes.js";
 import paketRoutes from "./src/routes/paketRoutes.js";
+import dashboardRoutes from "./src/routes/dashboardRoutes.js";
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use("/api/materi", materiRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/paket", paketRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.use(errorHandler);
 

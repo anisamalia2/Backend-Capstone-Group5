@@ -4,8 +4,8 @@ import pool from "../config/db.js";
 export const createMateri = async (data) => {
   const q = `
     INSERT INTO materi 
-      (judul, konten, file_url, guru_id, slug, deskripsi, tipe, kategori_id, durasi, kelas)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      (judul, konten, file_url, guru_id, slug, deskripsi, tipe, kategori_id, durasi, kelas, is_premium)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
     RETURNING *
   `;
 
@@ -20,6 +20,7 @@ export const createMateri = async (data) => {
     data.kategori_id || null,
     data.durasi || null,
     data.kelas || null,
+    data.is_premium !== undefined ? data.is_premium : false,
   ];
 
   const { rows } = await pool.query(q, vals);

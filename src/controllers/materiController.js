@@ -1,6 +1,7 @@
 import slugify from "slugify";
 import * as model from "../models/materiModel.js";
 import { updateMateriById, deleteMateriById } from "../models/materiModel.js";
+import { getUserPremiumUntilById } from "../models/userModel.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
@@ -59,6 +60,16 @@ export const getMateri = async (req, res) => {
 
     if (!materi) {
       return res.status(404).json({ message: "Materi not found" });
+    }
+
+    // If materi is premium, enforce access for non-GURU users
+    if (materi.is_premium && req.user?.role !== "GURU") {
+      const userPremium = await getUserPremiumUntilById(req.user.id);
+      const premiumUntil = userPremium ? userPremium.premium_until : null;
+
+      if (!premiumUntil || new Date(premiumUntil) <= new Date()) {
+        return res.status(403).json({ message: "Akses materi premium: berlangganan diperlukan atau sudah kadaluarsa" });
+      }
     }
 
     res.json(materi);
