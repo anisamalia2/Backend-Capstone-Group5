@@ -1,5 +1,7 @@
 import * as model from "../models/quizModel.js";
+import pool from "../config/db.js";
 
+// ================= CREATE QUIZ =================
 export const createQuiz = async (req, res) => {
   try {
     if (req.user.role !== "GURU")
@@ -15,16 +17,14 @@ export const createQuiz = async (req, res) => {
     });
 
     for (const s of soal || []) {
-      // VALIDASI khusus untuk soal tipe MCQ
+      // VALIDASI MCQ
       if (s.tipe === "MCQ") {
-        // minimal 2 opsi
         if (!Array.isArray(s.opsi) || s.opsi.length < 2) {
           return res.status(400).json({
             message: "Soal MCQ wajib punya minimal 2 opsi",
           });
         }
 
-        // cek struktur { key, text }
         const opsiValid = s.opsi.every((o) => o.key && o.text);
         if (!opsiValid) {
           return res.status(400).json({
@@ -32,7 +32,6 @@ export const createQuiz = async (req, res) => {
           });
         }
 
-        // jawaban harus dalam bentuk key (A/B/C/D)
         if (!s.jawaban || !["A", "B", "C", "D"].includes(s.jawaban)) {
           return res.status(400).json({
             message: "Jawaban MCQ harus berupa key opsi: A/B/C/D",
@@ -40,7 +39,7 @@ export const createQuiz = async (req, res) => {
         }
       }
 
-      // INSERT SOAL KE DATABASE
+      // INSERT SOAL
       await model.addSoal({
         quiz_id: quiz.id,
         pertanyaan: s.pertanyaan,
@@ -57,6 +56,19 @@ export const createQuiz = async (req, res) => {
   }
 };
 
+// ================= LIST QUIZ =================
+export const listQuiz = async (req, res) => {
+  try {
+    const quizzes = await model.getAllQuizWithSoal();
+    res.json(quizzes);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to load quiz list", error: err.message });
+  }
+};
+
+// ================= GET DETAIL QUIZ =================
 export const getQuiz = async (req, res) => {
   try {
     const q = await model.getQuizWithSoal(req.params.id);
@@ -67,6 +79,7 @@ export const getQuiz = async (req, res) => {
   }
 };
 
+// ================= SUBMIT QUIZ =================
 export const submitQuiz = async (req, res) => {
   try {
     const user_id = req.user.id;
@@ -95,6 +108,7 @@ export const submitQuiz = async (req, res) => {
   }
 };
 
+// ================= DELETE QUIZ =================
 export const hapusQuiz = async (req, res) => {
   try {
     await model.deleteQuiz(req.params.id, req.user.id);
@@ -104,14 +118,7 @@ export const hapusQuiz = async (req, res) => {
   }
 };
 
-export const listQuiz = async (req, res) => {
-  try {
-    res.json(await model.getAllQuiz());
-  } catch (err) {
-    res.status(500).json({ message: "Failed to load quiz list" });
-  }
-};
-
+// ================= GET QUIZ RESULT =================
 export const getQuizResult = async (req, res) => {
   try {
     const result = await model.getLastQuizResult(req.user.id, req.params.id);
@@ -149,6 +156,7 @@ export const getQuizResult = async (req, res) => {
   }
 };
 
+// ================= PEMBAHASAN QUIZ =================
 export const pembahasanQuiz = async (req, res) => {
   try {
     const quiz = await model.getQuizWithSoal(req.params.id);
@@ -183,31 +191,4 @@ export const pembahasanQuiz = async (req, res) => {
       .status(500)
       .json({ message: "Gagal memuat pembahasan", error: err.message });
   }
-};
-
-export const getQuizWithSoal = async (quiz_id) => {
-  const { rows } = await pool.query(
-    `SELECT 
-        q.*, 
-        (
-          SELECT json_agg(
-            json_build_object(
-              'id', s.id,
-              'quiz_id', s.quiz_id,
-              'tipe', s.tipe,
-              'pertanyaan', s.pertanyaan,
-              'opsi', COALESCE(s.opsi, '[]'::jsonb),
-              'jawaban', s.jawaban,
-              'penjelasan', s.penjelasan
-            )
-          )
-          FROM quiz_soal s
-          WHERE s.quiz_id = q.id
-        ) AS soal
-     FROM quiz q
-     WHERE q.id = $1`,
-    [quiz_id]
-  );
-
-  return rows[0] ? { ...rows[0], soal: rows[0].soal || [] } : null;
 };

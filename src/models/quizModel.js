@@ -37,7 +37,7 @@ export const getQuizWithSoal = async (quiz_id) => {
               'quiz_id', s.quiz_id,
               'tipe', s.tipe,
               'pertanyaan', s.pertanyaan,
-              'opsi', s.opsi,
+              'opsi', COALESCE(s.opsi,'[]'::jsonb),
               'jawaban', s.jawaban,
               'penjelasan', s.penjelasan
             )
@@ -50,6 +50,29 @@ export const getQuizWithSoal = async (quiz_id) => {
     [quiz_id]
   );
   return rows[0] ? { ...rows[0], soal: rows[0].soal || [] } : null;
+};
+
+// untuk list semua quiz beserta soal lengkap
+export const getAllQuizWithSoal = async () => {
+  const { rows } = await pool.query(`
+    SELECT q.*, (
+      SELECT json_agg(
+        json_build_object(
+          'id', s.id,
+          'tipe', s.tipe,
+          'pertanyaan', s.pertanyaan,
+          'opsi', COALESCE(s.opsi,'[]'::jsonb),
+          'jawaban', s.jawaban,
+          'penjelasan', s.penjelasan
+        )
+      )
+      FROM quiz_soal s
+      WHERE s.quiz_id = q.id
+    ) AS soal
+    FROM quiz q
+    ORDER BY q.id DESC
+  `);
+  return rows;
 };
 
 export const saveQuizResult = async ({
@@ -68,40 +91,17 @@ export const saveQuizResult = async ({
 };
 
 export const deleteQuiz = async (id, guruId) => {
-  // 1. Cek apakah quiz milik guru
   const cek = await pool.query(
     "SELECT * FROM quiz WHERE id = $1 AND guru_id = $2",
     [id, guruId]
   );
-
-  if (cek.rowCount === 0) {
+  if (cek.rowCount === 0)
     throw new Error("Quiz tidak ditemukan atau bukan milik Anda");
-  }
 
-  // 2. Hapus hasil pengerjaan quiz (quiz_jawaban_user)
   await pool.query("DELETE FROM quiz_jawaban_user WHERE quiz_id = $1", [id]);
-
-  // 3. Hapus semua soal quiz
   await pool.query("DELETE FROM quiz_soal WHERE quiz_id = $1", [id]);
-
-  // 4. Baru hapus quiz
   await pool.query("DELETE FROM quiz WHERE id = $1", [id]);
-
   return true;
-};
-
-export const getAllQuiz = async () => {
-  const { rows } = await pool.query(`
-    SELECT 
-      q.id,
-      q.judul,
-      q.kategori_id,
-      q.kelas,
-      (SELECT COUNT(*) FROM quiz_soal WHERE quiz_id = q.id) AS jumlah_soal
-    FROM quiz q
-    ORDER BY q.id DESC
-  `);
-  return rows;
 };
 
 export const getLastQuizResult = async (user_id, quiz_id) => {
