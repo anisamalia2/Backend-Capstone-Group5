@@ -2,20 +2,6 @@ import pool from "../config/db.js";
 
 // CREATE MATERI
 export const createMateri = async (data) => {
-  // Defensive: ensure `data` is provided
-  if (!data || typeof data !== "object") {
-    throw new Error("createMateri: invalid data object");
-  }
-
-  // Ensure is_premium is always a boolean (DB column NOT NULL)
-  const rawIsPremium =
-    typeof data.is_premium !== "undefined" ? data.is_premium : false;
-  const is_premium =
-    typeof rawIsPremium === "boolean"
-      ? rawIsPremium
-      : String(rawIsPremium) === "true" || String(rawIsPremium) === "1";
-
-  // SQL columns order must match values array below
   const q = `
     INSERT INTO materi 
       (judul, konten, file_url, guru_id, slug, deskripsi, tipe, kategori_id, durasi, kelas, is_premium)
@@ -25,7 +11,7 @@ export const createMateri = async (data) => {
 
   const vals = [
     data.judul,
-    data.konten || null,
+    data.konten,
     data.file_url || null,
     data.guru_id,
     data.slug,
@@ -34,17 +20,11 @@ export const createMateri = async (data) => {
     data.kategori_id || null,
     data.durasi || null,
     data.kelas || null,
-    is_premium,
+    data.is_premium !== undefined ? data.is_premium : false,
   ];
 
-  try {
-    const { rows } = await pool.query(q, vals);
-    return rows[0];
-  } catch (err) {
-    // Add contextual logging for easier debugging without leaking sensitive info
-    console.error("createMateri DB error:", err.message);
-    throw err;
-  }
+  const { rows } = await pool.query(q, vals);
+  return rows[0];
 };
 
 // GET DETAIL MATERI BY ID

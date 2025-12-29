@@ -61,7 +61,9 @@ export const setPaymentStatus = async ({ id, status, approved_by = null }) => {
         "SELECT duration_months FROM paket WHERE id = $1",
         [updated.paket_id]
       );
-      const durationMonths = pakRes.rows[0] ? pakRes.rows[0].duration_months : 1;
+      const durationMonths = pakRes.rows[0]
+        ? pakRes.rows[0].duration_months
+        : 1;
 
       await pool.query(
         `UPDATE users
