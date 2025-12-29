@@ -13,23 +13,27 @@ export const createPayment = async (req, res) => {
       return res.status(400).json({ message: "paket_id required" });
     }
 
-    // LOG DEBUG (TARUH DI SINI)
-    console.log("paket_id:", paket_id);
-    console.log("DB URL:", process.env.DATABASE_URL ? "OK" : "MISSING");
+    // DISESUAIKAN: Cek apakah user punya transaksi pending/waiting
+    const existing = await pool.query(
+      "SELECT id FROM payments WHERE user_id = $1 AND (status = 'pending' OR status = 'menunggu_verifikasi_admin')",
+      [user_id]
+    );
 
-    // Ambil paket
+    if (existing.rows.length > 0) {
+      return res.status(400).json({
+        message: "Selesaikan transaksi sebelumnya atau tunggu verifikasi guru.",
+      });
+    }
+
     const pak = await pool.query("SELECT id, harga FROM paket WHERE id = $1", [
       paket_id,
     ]);
-
     const paket = pak.rows[0];
     if (!paket) {
       return res.status(404).json({ message: "paket not found" });
     }
 
-    // Total WAJIB dari DB
     const total = paket.harga;
-
     const p = await model.createPayment({
       user_id,
       paket_id,
@@ -45,10 +49,9 @@ export const createPayment = async (req, res) => {
     });
   } catch (err) {
     console.error("CREATE PAYMENT ERROR:", err);
-    res.status(500).json({
-      message: "Create payment failed",
-      error: err.message,
-    });
+    res
+      .status(500)
+      .json({ message: "Create payment failed", error: err.message });
   }
 };
 
@@ -64,7 +67,6 @@ export const confirmPayment = async (req, res) => {
     if (p.user_id !== user_id)
       return res.status(403).json({ message: "Not your transaction" });
 
-    // perbarui status menjadi menunggu verifikasi
     const updated = await model.setPaymentStatus({
       id: transaction_id,
       status: "menunggu_verifikasi_admin",
@@ -75,7 +77,6 @@ export const confirmPayment = async (req, res) => {
       payment: updated,
     });
   } catch (err) {
-    console.error(err);
     res
       .status(500)
       .json({ message: "Confirm payment failed", error: err.message });
@@ -89,7 +90,6 @@ export const getPaymentStatus = async (req, res) => {
     const p = await model.getPaymentById(id);
     if (!p) return res.status(404).json({ message: "Transaction not found" });
     if (p.user_id !== user_id && req.user.role !== "GURU") {
-      // hanya  guru (admin) yang bisa lihat
       return res.status(403).json({ message: "Access denied" });
     }
     res.json(p);
@@ -98,66 +98,52 @@ export const getPaymentStatus = async (req, res) => {
   }
 };
 
-// Admin (guru): list pending payments
 export const listPayments = async (req, res) => {
   try {
     const list = await model.listPendingPayments();
     res.json(list);
   } catch (err) {
-    console.error(err);
     res
       .status(500)
       .json({ message: "List payments failed", error: err.message });
   }
 };
 
-// Admin (guru): auto-reject pending transactions older than 24 hours (for UAT/cron)
 export const autoRejectPayments = async (req, res) => {
   try {
     if (req.user.role !== "GURU")
       return res.status(403).json({ message: "Akses hanya untuk GURU" });
-
     const rejected = await model.autoRejectPayments();
-
     res.json({
       message: "Auto-reject complete",
       rejected_count: rejected.length,
       payments: rejected,
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: "Auto reject failed", error: err.message });
   }
 };
 
-// Admin (guru): approve payment
 export const approvePayment = async (req, res) => {
   try {
     const adminId = req.user.id;
     const id = req.params.id;
-
     const p = await model.getPaymentById(id);
     if (!p) return res.status(404).json({ message: "Transaction not found" });
     if (p.status === "paid")
       return res.status(400).json({ message: "Transaction already paid" });
 
-    // update status -> paid
     const updated = await model.setPaymentStatus({
-      id: id,
+      id,
       status: "paid",
       approved_by: adminId,
     });
-
-    // premium update is handled in model.setPaymentStatus
-
     res.json({ message: "Payment approved", payment: updated });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: "Approve failed", error: err.message });
   }
 };
 
-// Admin (guru): reject payment
 export const rejectPayment = async (req, res) => {
   try {
     const id = req.params.id;
@@ -167,13 +153,12 @@ export const rejectPayment = async (req, res) => {
       return res.status(400).json({ message: "Transaction already paid" });
 
     const updated = await model.setPaymentStatus({
-      id: id,
+      id,
       status: "rejected",
       approved_by: req.user.id,
     });
     res.json({ message: "Payment rejected", payment: updated });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: "Reject failed", error: err.message });
   }
 };

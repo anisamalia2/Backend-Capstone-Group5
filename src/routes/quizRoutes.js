@@ -10,6 +10,7 @@ import {
   listQuiz,
   getQuizResult,
   pembahasanQuiz,
+  updateQuiz,
 } from "../controllers/quizController.js";
 
 const router = express.Router();
@@ -34,5 +35,7 @@ router.post("/", verifyToken, roleGuru, createQuiz);
 
 // DELETE QUIZ
 router.delete("/:id", verifyToken, roleGuru, hapusQuiz);
+
+router.put("/:id", verifyToken, roleGuru, updateQuiz);
 
 export default router;
