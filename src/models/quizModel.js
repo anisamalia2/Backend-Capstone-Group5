@@ -1,7 +1,5 @@
 import pool from "../config/db.js";
 
-// --- FUNGSI QUIZ YANG DIBUTUHKAN CONTROLLER ---
-
 export const createQuiz = async ({ judul, kategori_id, kelas, guru_id }) => {
   const { rows } = await pool.query(
     `INSERT INTO quiz (judul, kategori_id, kelas, guru_id) VALUES ($1, $2, $3, $4) RETURNING *`,
@@ -66,8 +64,6 @@ export const deleteQuiz = async (id, guru_id) => {
     guru_id,
   ]);
 };
-
-// --- FUNGSI HASIL QUIZ ---
 
 export const saveQuizResult = async ({
   user_id,

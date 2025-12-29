@@ -17,7 +17,19 @@ export const createQuiz = async (req, res) => {
     });
 
     for (const s of soal || []) {
-      // INSERT SOAL
+      if (s.tipe === "MCQ") {
+        if (!Array.isArray(s.opsi) || s.opsi.length < 2) {
+          return res
+            .status(400)
+            .json({ message: "Soal MCQ wajib punya minimal 2 opsi" });
+        }
+        if (!s.jawaban || !["A", "B", "C", "D"].includes(s.jawaban)) {
+          return res
+            .status(400)
+            .json({ message: "Jawaban MCQ harus berupa key opsi: A/B/C/D" });
+        }
+      }
+
       await model.addSoal({
         quiz_id: quiz.id,
         pertanyaan: s.pertanyaan,
@@ -34,7 +46,7 @@ export const createQuiz = async (req, res) => {
   }
 };
 
-// ================= UPDATE QUIZ (BARU) =================
+// ================= UPDATE QUIZ (TAMBAHAN UNTUK FIX 404) =================
 export const updateQuiz = async (req, res) => {
   try {
     if (req.user.role !== "GURU")
@@ -43,18 +55,17 @@ export const updateQuiz = async (req, res) => {
     const { id } = req.params;
     const { judul, kategori_id, kelas, soal } = req.body;
 
-    // 1. Update data dasar quiz
-    const updated = await model.updateQuizData(id, {
+    // 1. Update data quiz utama
+    const quiz = await model.updateQuizData(id, {
       judul,
       kategori_id,
       kelas,
       guru_id: req.user.id,
     });
 
-    if (!updated)
-      return res.status(404).json({ message: "Quiz tidak ditemukan" });
+    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
 
-    // 2. Hapus soal lama dan masukkan soal baru (Cara paling bersih untuk sinkronisasi)
+    // 2. Hapus soal lama lalu masukkan soal baru
     await model.deleteAllSoalByQuizId(id);
 
     for (const s of soal || []) {
@@ -68,7 +79,7 @@ export const updateQuiz = async (req, res) => {
       });
     }
 
-    res.json({ message: "Quiz berhasil diperbarui" });
+    res.json({ message: "Quiz updated successfully" });
   } catch (err) {
     res.status(500).json({ message: "Update quiz failed", error: err.message });
   }
@@ -94,16 +105,6 @@ export const getQuiz = async (req, res) => {
     res.json(q);
   } catch (err) {
     res.status(500).json({ message: "Get quiz failed", error: err.message });
-  }
-};
-
-// ================= DELETE QUIZ =================
-export const hapusQuiz = async (req, res) => {
-  try {
-    await model.deleteQuiz(req.params.id, req.user.id);
-    res.json({ message: "Quiz berhasil dihapus" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 };
 
@@ -136,6 +137,16 @@ export const submitQuiz = async (req, res) => {
   }
 };
 
+// ================= DELETE QUIZ =================
+export const hapusQuiz = async (req, res) => {
+  try {
+    await model.deleteQuiz(req.params.id, req.user.id);
+    res.json({ message: "Quiz berhasil dihapus" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // ================= GET QUIZ RESULT =================
 export const getQuizResult = async (req, res) => {
   try {
@@ -151,7 +162,6 @@ export const getQuizResult = async (req, res) => {
 
     const detail = q.soal.map((s) => {
       const ans = result.jawab_json?.find((a) => a.soal_id == s.id);
-
       return {
         soal_id: s.id,
         pertanyaan: s.pertanyaan,
