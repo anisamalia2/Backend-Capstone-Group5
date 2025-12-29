@@ -4,51 +4,104 @@ import { updateMateriById, deleteMateriById } from "../models/materiModel.js";
 import { getUserPremiumUntilById } from "../models/userModel.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
+import pool from "../config/db.js";
 
 //   CREATE MATERI  Mendukung 3 tipe: 1. FILE (video, pdf, ppt), 2. LINK YouTube, 3. TEXT ONLY
 export const createMateri = async (req, res) => {
   try {
     const { judul, konten, deskripsi, tipe, kategori_id, durasi, kelas } =
-      req.body;
+      req.body || {};
+
+    // Basic validation
+    if (!judul || !tipe) {
+      return res.status(400).json({
+        message: "Field 'judul' and 'tipe' are required",
+      });
+    }
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Parse is_premium reliably (default false)
+    const rawIsPremium =
+      req.body && typeof req.body.is_premium !== "undefined"
+        ? req.body.is_premium
+        : false;
+    const is_premium =
+      typeof rawIsPremium === "boolean"
+        ? rawIsPremium
+        : rawIsPremium === "true" || rawIsPremium === "1" || rawIsPremium === 1;
 
     let file_url = null;
 
-    // Upload file jika tipe file
+    // Upload file jika ada
     if (req.file) {
-      const uploadStream = () =>
-        new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            { folder: "materi" },
-            (err, result) => (err ? reject(err) : resolve(result))
-          );
-          streamifier.createReadStream(req.file.buffer).pipe(stream);
-        });
+      try {
+        const uploadStream = () =>
+          new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "materi" },
+              (err, result) => (err ? reject(err) : resolve(result))
+            );
+            streamifier.createReadStream(req.file.buffer).pipe(stream);
+          });
 
-      const result = await uploadStream();
-      file_url = result.secure_url;
+        const result = await uploadStream();
+        file_url = result && result.secure_url ? result.secure_url : null;
+      } catch (uploadErr) {
+        console.error("Cloudinary upload failed:", uploadErr);
+        return res.status(500).json({
+          message: "File upload failed",
+          error: uploadErr.message || String(uploadErr),
+        });
+      }
     }
 
-    const slug = slugify(judul, { lower: true, strict: true });
+    // Create a unique slug (append counter if needed)
+    const baseSlug = slugify(judul, { lower: true, strict: true }) || "materi";
+    let slug = baseSlug;
+    let counter = 1;
+    try {
+      let exists = await pool.query("SELECT 1 FROM materi WHERE slug = $1", [
+        slug,
+      ]);
+      while (exists.rows && exists.rows.length > 0) {
+        slug = `${baseSlug}-${counter++}`;
+        exists = await pool.query("SELECT 1 FROM materi WHERE slug = $1", [
+          slug,
+        ]);
+      }
+    } catch (dbErr) {
+      console.error("DB error when checking slug uniqueness:", dbErr);
+      return res
+        .status(500)
+        .json({ message: "Database error", error: dbErr.message });
+    }
 
-    const created = await model.createMateri({
+    // Build payload and persist
+    const payload = {
       judul,
       konten,
       file_url,
       guru_id: req.user.id,
       slug,
-      deskripsi,
+      deskripsi: deskripsi || null,
       tipe,
-      kategori_id,
-      durasi,
-      kelas,
-    });
+      kategori_id: kategori_id || null,
+      durasi: durasi || null,
+      kelas: kelas || null,
+      is_premium: !!is_premium,
+    };
 
-    res.status(201).json(created);
+    const created = await model.createMateri(payload);
+
+    return res.status(201).json(created);
   } catch (err) {
-    res.status(500).json({
-      message: "Create materi failed",
-      error: err.message,
-    });
+    console.error("Create materi failed:", err);
+    return res
+      .status(500)
+      .json({ message: "Create materi failed", error: err.message });
   }
 };
 
@@ -68,7 +121,12 @@ export const getMateri = async (req, res) => {
       const premiumUntil = userPremium ? userPremium.premium_until : null;
 
       if (!premiumUntil || new Date(premiumUntil) <= new Date()) {
-        return res.status(403).json({ message: "Akses materi premium: berlangganan diperlukan atau sudah kadaluarsa" });
+        return res
+          .status(403)
+          .json({
+            message:
+              "Akses materi premium: berlangganan diperlukan atau sudah kadaluarsa",
+          });
       }
     }
 
