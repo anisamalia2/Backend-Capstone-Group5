@@ -4,6 +4,12 @@ import { updateMateriById, deleteMateriById } from "../models/materiModel.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
+// ===== NORMALIZER (WAJIB) =====
+const normalizeInt = (v) =>
+  v === "" || typeof v === "undefined" ? null : Number(v);
+
+const normalizeText = (v) => (v === "" || typeof v === "undefined" ? null : v);
+
 //   CREATE MATERI  Mendukung 3 tipe: 1. FILE (video, pdf, ppt), 2. LINK YouTube, 3. TEXT ONLY
 export const createMateri = async (req, res) => {
   try {
@@ -15,9 +21,10 @@ export const createMateri = async (req, res) => {
     }
 
     // Parse is_premium from FormData string to boolean (frontend sends "true"/"false")
-    const is_premium = req.body && typeof req.body.is_premium !== "undefined"
-      ? req.body.is_premium === "true"
-      : false;
+    const is_premium =
+      req.body && typeof req.body.is_premium !== "undefined"
+        ? req.body.is_premium === "true"
+        : false;
 
     let file_url = null;
 
@@ -40,20 +47,21 @@ export const createMateri = async (req, res) => {
 
     const created = await model.createMateri({
       judul,
-      konten,
+      konten: normalizeText(konten),
       file_url,
       guru_id: req.user.id,
       slug,
-      deskripsi,
-      tipe,
-      kategori_id,
-      durasi,
-      kelas,
+      deskripsi: normalizeText(deskripsi),
+      tipe: normalizeText(tipe),
+      kategori_id: normalizeInt(kategori_id),
+      durasi: normalizeInt(durasi),
+      kelas: normalizeText(kelas),
       is_premium,
     });
 
     res.status(201).json(created);
   } catch (err) {
+    console.error("CREATE MATERI ERROR:", err);
     res.status(500).json({
       message: "Create materi failed",
       error: err.message,
