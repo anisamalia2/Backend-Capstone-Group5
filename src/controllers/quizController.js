@@ -17,19 +17,29 @@ export const createQuiz = async (req, res) => {
     });
 
     for (const s of soal || []) {
+      // VALIDASI MCQ
       if (s.tipe === "MCQ") {
         if (!Array.isArray(s.opsi) || s.opsi.length < 2) {
-          return res
-            .status(400)
-            .json({ message: "Soal MCQ wajib punya minimal 2 opsi" });
+          return res.status(400).json({
+            message: "Soal MCQ wajib punya minimal 2 opsi",
+          });
         }
+
+        const opsiValid = s.opsi.every((o) => o.key && o.text);
+        if (!opsiValid) {
+          return res.status(400).json({
+            message: "Format opsi harus { key: 'A', text: '...' }",
+          });
+        }
+
         if (!s.jawaban || !["A", "B", "C", "D"].includes(s.jawaban)) {
-          return res
-            .status(400)
-            .json({ message: "Jawaban MCQ harus berupa key opsi: A/B/C/D" });
+          return res.status(400).json({
+            message: "Jawaban MCQ harus berupa key opsi: A/B/C/D",
+          });
         }
       }
 
+      // INSERT SOAL
       await model.addSoal({
         quiz_id: quiz.id,
         pertanyaan: s.pertanyaan,
@@ -43,45 +53,6 @@ export const createQuiz = async (req, res) => {
     res.status(201).json({ quiz_id: quiz.id });
   } catch (err) {
     res.status(500).json({ message: "Create quiz failed", error: err.message });
-  }
-};
-
-// ================= UPDATE QUIZ (TAMBAHAN UNTUK FIX 404) =================
-export const updateQuiz = async (req, res) => {
-  try {
-    if (req.user.role !== "GURU")
-      return res.status(403).json({ message: "Akses hanya untuk GURU" });
-
-    const { id } = req.params;
-    const { judul, kategori_id, kelas, soal } = req.body;
-
-    // 1. Update data quiz utama
-    const quiz = await model.updateQuizData(id, {
-      judul,
-      kategori_id,
-      kelas,
-      guru_id: req.user.id,
-    });
-
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
-
-    // 2. Hapus soal lama lalu masukkan soal baru
-    await model.deleteAllSoalByQuizId(id);
-
-    for (const s of soal || []) {
-      await model.addSoal({
-        quiz_id: id,
-        pertanyaan: s.pertanyaan,
-        tipe: s.tipe,
-        opsi: s.opsi,
-        jawaban: s.jawaban,
-        penjelasan: s.penjelasan,
-      });
-    }
-
-    res.json({ message: "Quiz updated successfully" });
-  } catch (err) {
-    res.status(500).json({ message: "Update quiz failed", error: err.message });
   }
 };
 
@@ -162,6 +133,7 @@ export const getQuizResult = async (req, res) => {
 
     const detail = q.soal.map((s) => {
       const ans = result.jawab_json?.find((a) => a.soal_id == s.id);
+
       return {
         soal_id: s.id,
         pertanyaan: s.pertanyaan,
