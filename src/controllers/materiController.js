@@ -121,12 +121,10 @@ export const getMateri = async (req, res) => {
       const premiumUntil = userPremium ? userPremium.premium_until : null;
 
       if (!premiumUntil || new Date(premiumUntil) <= new Date()) {
-        return res
-          .status(403)
-          .json({
-            message:
-              "Akses materi premium: berlangganan diperlukan atau sudah kadaluarsa",
-          });
+        return res.status(403).json({
+          message:
+            "Akses materi premium: berlangganan diperlukan atau sudah kadaluarsa",
+        });
       }
     }
 
