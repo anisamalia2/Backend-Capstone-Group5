@@ -35,6 +35,13 @@ export const createMateri = async (req, res) => {
 
     let file_url = null;
 
+    // If frontend contract indicates a file is required when tipe === 'FILE', enforce it
+    if (tipe === "FILE" && !req.file) {
+      return res
+        .status(400)
+        .json({ message: "File is required when tipe === 'FILE'" });
+    }
+
     // Upload file jika ada
     if (req.file) {
       try {
@@ -159,12 +166,22 @@ export const listMateri = async (req, res) => {
 //  UPDATE MATERI
 export const updateMateri = async (req, res) => {
   try {
-    if (req.user.role !== "GURU")
+    if (!req.user || req.user.role !== "GURU")
       return res.status(403).json({ message: "Akses hanya untuk GURU" });
 
     const { id } = req.params;
     const { judul, konten, deskripsi, tipe, kategori_id, durasi, kelas } =
-      req.body;
+      req.body || {};
+
+    // parse is_premium defensively (supports string | boolean | number)
+    const rawIsPremium = req.body?.is_premium;
+    const isPremiumProvided = typeof rawIsPremium !== "undefined";
+
+    const isPremium =
+      rawIsPremium === true ||
+      rawIsPremium === "true" ||
+      rawIsPremium === 1 ||
+      rawIsPremium === "1";
 
     let file_url = null;
 
@@ -182,6 +199,8 @@ export const updateMateri = async (req, res) => {
       file_url = result.secure_url;
     }
 
+    // Pass is_premium as last param (null to keep existing)
+    const isPremiumParam = isPremiumProvided ? isPremium : undefined;
     const materi = await updateMateriById(
       id,
       req.user.id,
@@ -192,7 +211,8 @@ export const updateMateri = async (req, res) => {
       tipe,
       kategori_id,
       durasi,
-      kelas
+      kelas,
+      isPremiumParam
     );
 
     if (!materi) {

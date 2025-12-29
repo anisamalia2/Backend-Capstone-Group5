@@ -106,19 +106,21 @@ export const updateMateriById = async (
   tipe,
   kategori_id,
   durasi,
-  kelas
+  kelas,
+  is_premium
 ) => {
   const q = `
     UPDATE materi
     SET 
-      judul = $3,
-      konten = $4,
+      judul = COALESCE($3, judul),
+      konten = COALESCE($4, konten),
       file_url = COALESCE($5, file_url),
-      deskripsi = $6,
-      tipe = $7,
-      kategori_id = $8,
-      durasi = $9,
-      kelas = $10,
+      deskripsi = COALESCE($6, deskripsi),
+      tipe = COALESCE($7, tipe),
+      kategori_id = COALESCE($8, kategori_id),
+      durasi = COALESCE($9, durasi),
+      kelas = COALESCE($10, kelas),
+      is_premium = COALESCE($11, is_premium),
       updated_at = NOW()
     WHERE id = $1 AND guru_id = $2
     RETURNING *
@@ -127,14 +129,17 @@ export const updateMateriById = async (
   const vals = [
     id,
     guruId,
-    judul,
-    konten,
-    file_url || null,
-    deskripsi || null,
-    tipe || null,
-    kategori_id || null,
-    durasi || null,
-    kelas || null,
+    // if caller omitted a field (undefined) pass null so COALESCE keeps existing
+    typeof judul === "undefined" ? null : judul,
+    typeof konten === "undefined" ? null : konten,
+    typeof file_url === "undefined" ? null : file_url,
+    typeof deskripsi === "undefined" ? null : deskripsi,
+    typeof tipe === "undefined" ? null : tipe,
+    typeof kategori_id === "undefined" ? null : kategori_id,
+    typeof durasi === "undefined" ? null : durasi,
+    typeof kelas === "undefined" ? null : kelas,
+    // pass boolean or null to allow COALESCE to keep existing value
+    typeof is_premium === "undefined" ? null : is_premium,
   ];
 
   const { rows } = await pool.query(q, vals);
