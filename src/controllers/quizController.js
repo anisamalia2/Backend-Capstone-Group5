@@ -184,3 +184,30 @@ export const pembahasanQuiz = async (req, res) => {
       .json({ message: "Gagal memuat pembahasan", error: err.message });
   }
 };
+
+export const getQuizWithSoal = async (quiz_id) => {
+  const { rows } = await pool.query(
+    `SELECT 
+        q.*, 
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', s.id,
+              'quiz_id', s.quiz_id,
+              'tipe', s.tipe,
+              'pertanyaan', s.pertanyaan,
+              'opsi', COALESCE(s.opsi, '[]'::jsonb),
+              'jawaban', s.jawaban,
+              'penjelasan', s.penjelasan
+            )
+          )
+          FROM quiz_soal s
+          WHERE s.quiz_id = q.id
+        ) AS soal
+     FROM quiz q
+     WHERE q.id = $1`,
+    [quiz_id]
+  );
+
+  return rows[0] ? { ...rows[0], soal: rows[0].soal || [] } : null;
+};
