@@ -20,9 +20,9 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const id = req.user.id;
-    const { name, kelas } = req.body;
+    const { username, nomor_whatsapp } = req.body;
     // hanya perbarui field yang diberikan, tidak mereset avatar
-    const updated = await updateUserProfile(id, { name, kelas });
+    const updated = await updateUserProfile(id, { username, nomor_whatsapp });
     res.json({ message: "Profile updated", user: updated });
   } catch (err) {
     res
