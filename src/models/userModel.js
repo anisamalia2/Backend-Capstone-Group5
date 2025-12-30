@@ -68,3 +68,10 @@ export const updateUserProfile = async (
 export const saveAvatar = async (id, url) => {
   await pool.query("UPDATE users SET avatar_url = $1 WHERE id = $2", [url, id]);
 };
+
+export const updateUserPassword = async (id, hashedPassword) => {
+  await pool.query("UPDATE users SET password = $1 WHERE id = $2", [
+    hashedPassword,
+    id,
+  ]);
+};

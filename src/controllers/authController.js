@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { createUser, findUserByWhatsapp } from "../models/userModel.js";
+import { updateUserPassword } from "../models/userModel.js";
 dotenv.config();
 
 export const register = async (req, res) => {
@@ -103,5 +104,47 @@ export const getMe = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Get profile failed", error: err.message });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { nomor_whatsapp, username, new_password } = req.body;
+
+    // 1. Cari user berdasarkan Nomor WhatsApp
+    const user = await findUserByWhatsapp(nomor_whatsapp);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "Nomor WhatsApp tidak ditemukan" });
+    }
+
+    // 2. Verifikasi Username (Sebagai pengganti OTP sementara)
+    // User harus memasukkan username yang benar agar bisa reset
+    if (user.username !== username) {
+      return res.status(400).json({
+        message:
+          "Verifikasi gagal! Username tidak cocok dengan nomor WhatsApp tersebut.",
+      });
+    }
+
+    // 3. Validasi Password Baru
+    if (!new_password || new_password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password baru minimal 6 karakter" });
+    }
+
+    // 4. Hash Password Baru
+    const hashed = await bcrypt.hash(new_password, 10);
+
+    // 5. Update di Database
+    await updateUserPassword(user.id, hashed);
+
+    res.json({ message: "Password berhasil direset. Silakan login kembali." });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Reset password gagal", error: err.message });
   }
 };

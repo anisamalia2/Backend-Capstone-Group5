@@ -4,6 +4,12 @@ import { runValidation } from "../middleware/validator.js";
 import { register, login } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/auth.js";
 import { getMe } from "../controllers/authController.js";
+import {
+  register,
+  login,
+  getMe,
+  resetPassword,
+} from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -41,6 +47,21 @@ router.post(
   ],
   runValidation,
   login
+);
+
+router.post(
+  "/reset-password",
+  [
+    body("nomor_whatsapp").notEmpty().withMessage("Nomor whatsapp is required"),
+    body("username")
+      .notEmpty()
+      .withMessage("Username is required for verification"),
+    body("new_password")
+      .isLength({ min: 6 })
+      .withMessage("Password min 6 chars"),
+  ],
+  runValidation,
+  resetPassword
 );
 
 //  GET CURRENT USER (SESSION)
