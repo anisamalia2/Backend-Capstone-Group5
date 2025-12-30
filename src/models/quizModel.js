@@ -115,3 +115,22 @@ export const getLastQuizResult = async (user_id, quiz_id) => {
   );
   return rows[0];
 };
+
+// ==================== NEW UPDATE FEATURES ====================
+
+// Update Data Utama Quiz (Judul, Kategori, Kelas)
+export const updateQuizHeader = async (id, quiz, guruId) => {
+  const { rows } = await pool.query(
+    `UPDATE quiz 
+     SET judul = $1, kategori_id = $2, kelas = $3
+     WHERE id = $4 AND guru_id = $5
+     RETURNING *`,
+    [quiz.judul, quiz.kategori_id, quiz.kelas, id, guruId]
+  );
+  return rows[0];
+};
+
+// Hapus semua soal lama sebelum insert yang baru (Reset Soal)
+export const deleteSoalByQuizId = async (quizId) => {
+  await pool.query("DELETE FROM quiz_soal WHERE quiz_id = $1", [quizId]);
+};

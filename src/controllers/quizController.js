@@ -1,9 +1,9 @@
 import * as model from "../models/quizModel.js";
-import pool from "../config/db.js";
 
 // ================= CREATE QUIZ =================
 export const createQuiz = async (req, res) => {
   try {
+    // Note: Middleware roleGuru biasanya sudah handle cek role, tapi double check oke
     if (req.user.role !== "GURU")
       return res.status(403).json({ message: "Akses hanya untuk GURU" });
 
@@ -53,6 +53,67 @@ export const createQuiz = async (req, res) => {
     res.status(201).json({ quiz_id: quiz.id });
   } catch (err) {
     res.status(500).json({ message: "Create quiz failed", error: err.message });
+  }
+};
+
+// ================= UPDATE QUIZ (BARU) =================
+export const updateQuiz = async (req, res) => {
+  try {
+    const quizId = req.params.id;
+    const { judul, kategori_id, kelas, soal } = req.body;
+    const guruId = req.user.id;
+
+    // 1. Update Header Quiz
+    const updatedQuiz = await model.updateQuizHeader(
+      quizId,
+      { judul, kategori_id, kelas },
+      guruId
+    );
+
+    if (!updatedQuiz) {
+      return res.status(404).json({
+        message:
+          "Quiz tidak ditemukan atau Anda tidak memiliki akses mengedit ini",
+      });
+    }
+
+    // 2. Jika ada data soal dikirim, kita REPLACE soal lama
+    if (soal && Array.isArray(soal) && soal.length > 0) {
+      // A. Validasi format soal dulu
+      for (const s of soal) {
+        if (s.tipe === "MCQ") {
+          if (!Array.isArray(s.opsi) || s.opsi.length < 2) {
+            return res
+              .status(400)
+              .json({ message: "Soal MCQ wajib punya minimal 2 opsi" });
+          }
+          if (!s.jawaban || !["A", "B", "C", "D"].includes(s.jawaban)) {
+            return res
+              .status(400)
+              .json({ message: "Jawaban MCQ harus A/B/C/D" });
+          }
+        }
+      }
+
+      // B. Hapus semua soal lama
+      await model.deleteSoalByQuizId(quizId);
+
+      // C. Insert soal baru
+      for (const s of soal) {
+        await model.addSoal({
+          quiz_id: quizId,
+          pertanyaan: s.pertanyaan,
+          tipe: s.tipe,
+          opsi: s.opsi,
+          jawaban: s.jawaban,
+          penjelasan: s.penjelasan,
+        });
+      }
+    }
+
+    res.json({ message: "Quiz berhasil diupdate", quiz: updatedQuiz });
+  } catch (err) {
+    res.status(500).json({ message: "Gagal update quiz", error: err.message });
   }
 };
 
