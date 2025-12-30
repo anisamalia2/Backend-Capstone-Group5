@@ -1,9 +1,7 @@
 import express from "express";
 import { body } from "express-validator";
 import { runValidation } from "../middleware/validator.js";
-import { register, login } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/auth.js";
-import { getMe } from "../controllers/authController.js";
 import {
   register,
   login,
