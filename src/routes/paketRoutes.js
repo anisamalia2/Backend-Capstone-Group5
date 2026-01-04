@@ -9,14 +9,14 @@ import {
 
 const router = express.Router();
 
-router.post("/", createPaketController);
+router.post("/", verifyToken, roleGuru, createPaketController);
 
 router.get("/", getAllPaketController);
 
 router.get("/:id", getPaketByIdController);
 
-router.put("/:id", updatePaketController);
+router.put("/:id", verifyToken, roleGuru, updatePaketController);
 
-router.delete("/:id", deletePaketController);
+router.delete("/:id", verifyToken, roleGuru, deletePaketController);
 
 export default router;
